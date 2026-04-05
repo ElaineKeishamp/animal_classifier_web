@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Animal Classifier</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="card">
+  <h1>🐾 Animal Classifier</h1>
+  <p class="subtitle">Upload gambar hewan — Cat, Dog, atau Wild</p>
+
+  <div class="upload-area" id="upload-area">
+    <input type="file" id="fileInput" accept="image/*">
+    <div class="upload-icon">📁</div>
+    <p>Klik atau drag & drop gambar di sini</p>
+  </div>
+
+  <div id="preview-wrap">
+    <img id="preview" src="" alt="Preview">
+  </div>
+
+  <button id="btn" onclick="predict()" disabled>Klasifikasikan</button>
+
+  <div id="result"></div>
+</div>
+
+<script>
+  const emojis = { cat: '🐱', dog: '🐶', wild: '🦁' };
+
+  document.getElementById('fileInput').addEventListener('change', function() {
+    const file = this.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = e => {
+      document.getElementById('preview').src = e.target.result;
+      document.getElementById('preview-wrap').style.display = 'block';
+      document.getElementById('result').style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+    document.getElementById('btn').disabled = false;
+  });
+
+  async function predict() {
+    const file = document.getElementById('fileInput').files[0];
+    if (!file) return;
+
+    const btn = document.getElementById('btn');
+    btn.disabled = true;
+    btn.textContent = 'Memproses...';
+
+    const resultDiv = document.getElementById('result');
+    resultDiv.style.display = 'block';
+    resultDiv.innerHTML = '<div class="loading">⏳ Menganalisis gambar...</div>';
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch('/predict', { method: 'POST', body: formData });
+      const data = await response.json();
+
+      const sorted = Object.entries(data.scores).sort((a, b) => b[1] - a[1]);
+      const top = sorted[0][0];
+
+      let html = `
+        <div class="result-emoji">${emojis[top] || '🐾'}</div>
+        <div class="result-label">${top}</div>
+        <p class="confidence-title">Confidence Score</p>
+      `;
+
+      sorted.forEach(([label, score]) => {
+        html += `
+          <div class="bar-wrap">
+            <div class="bar-label"><span>${label}</span><span>${score}%</span></div>
+            <div class="bar-bg">
+              <div class="bar-fill ${label === top ? 'top' : ''}" style="width:${score}%"></div>
+            </div>
+          </div>`;
+      });
+
+      resultDiv.innerHTML = html;
+    } catch (e) {
+      resultDiv.innerHTML = '<p class="error-msg">Terjadi error, coba lagi.</p>';
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Klasifikasikan';
+  }
+</script>
+</body>
+</html>
